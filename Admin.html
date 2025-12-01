@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scratch Earn Admin</title>
+    <style>
+        /* SECURITY: Body hidden initially */
+        body { display: none; background: #1e272e; color: white; padding: 15px; font-family: sans-serif; margin: 0; }
+        
+        h1 { border-bottom: 2px solid #00d2d3; padding-bottom: 10px; color: #00d2d3; }
+        h3 { margin-top: 25px; border-left: 4px solid #ff9f43; padding-left: 10px; }
+        
+        .card { background: #2f3640; padding: 15px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        
+        input, textarea { width: 100%; padding: 10px; margin: 5px 0; border-radius: 5px; border: none; background: #dfe6e9; color: #000; box-sizing: border-box; }
+        
+        button { padding: 10px 15px; cursor: pointer; font-weight: bold; border-radius: 5px; border: none; color: white; margin-right: 5px; margin-top: 5px; }
+        .approve { background: #00b894; } 
+        .reject { background: #ff6b6b; } 
+        .action { background: #0984e3; }
+        .ban { background: #000; border: 1px solid red; color: red; }
+        
+        .status-badge { padding: 3px 8px; border-radius: 4px; font-size: 12px; background: #f39c12; color: white; }
+    </style>
+</head>
+<body>
+
+    <h1>👑 Owner Dashboard</h1>
+
+    <!-- 1. APP UPDATE CONTROL -->
+    <div class="card" style="border-top: 3px solid #0984e3;">
+        <h3>📲 App Update System</h3>
+        <p style="font-size:12px; color:#aaa;">Change version number to force users to update.</p>
+        <input type="number" id="app-version" placeholder="Current Version (e.g. 2)">
+        <button class="action" onclick="pushUpdate()">🚀 Push Update</button>
+    </div>
+
+    <!-- 2. WITHDRAWALS MANAGEMENT -->
+    <h3>💰 Pending Withdrawals</h3>
+    <div id="withdraw-list">Loading requests...</div>
+
+    <!-- 3. SEND NOTIFICATION -->
+    <h3>🔔 Send Notification</h3>
+    <div class="card">
+        <input type="text" id="notif-uid" placeholder="User UID (Leave empty to send Global Alert)">
+        <input type="text" id="notif-title" placeholder="Title (e.g. Payment Done)">
+        <textarea id="notif-body" rows="2" placeholder="Message body..."></textarea>
+        <button class="action" onclick="sendNotification()">Send Message</button>
+    </div>
+
+    <!-- 4. USER SEARCH & BAN -->
+    <h3>🔍 User Manager</h3>
+    <div class="card">
+        <input type="text" id="search-uid" placeholder="Paste User UID">
+        <button class="action" onclick="searchUser()">Search</button>
+        <div id="user-result" style="margin-top:10px;"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs, increment, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+        const firebaseConfig = { apiKey: "AIzaSyDd1yHbSx1TYuY53nag-nzckea-7yQGah4", authDomain: "studio-3036297528-fe06e.firebaseapp.com", projectId: "studio-3036297528-fe06e" };
+        const app = initializeApp(firebaseConfig); const auth = getAuth(app); const db = getFirestore(app);
+
+        // ==========================================
+        // ⚠️ OWNER UID (YAHAN APNA UID DALO)
+        // ==========================================
+        const OWNER_UID = "MsvYltLdpseRpZcDJI4AL5J6AYo1"; 
+
+        // SECURITY CHECK
+        onAuthStateChanged(auth, (user) => {
+            if (user && user.uid === OWNER_UID) {
+                document.body.style.display = "block";
+                loadWithdrawals();
+            } else {
+                document.body.innerHTML = "<h2 style='color:red; text-align:center; margin-top:50px;'>ACCESS DENIED</h2>";
+                // Optional: Redirect back to app
+                // window.location.href = "index.html"; 
+            }
+        });
+
+        // --- 1. WITHDRAWAL LOGIC ---
+        async function loadWithdrawals() {
+            const list = document.getElementById('withdraw-list');
+            list.innerHTML = "Loading...";
+            
+            try {
+                const q = query(collection(db, "withdrawals"), where("status", "==", "Pending"));
+                const snap = await getDocs(q);
+                
+                let html = "";
+                snap.forEach(d => {
+                    const data = d.data();
+                    html += `
+                    <div class="card">
+                        <p style="margin:5px 0; font-size:12px; color:#ccc;">UID: ${data.uid}</p>
+                        <h2 style="margin:5px 0; color:#f1c40f;">${data.amount} Coins</h2>
+                        <p><b>Via:</b> ${data.method}</p>
+                        <p style="background:#222; padding:8px; border-radius:5px;">${data.detail}</p>
+                        
+                        <div style="margin-top:10px;">
+                            <button class="approve" onclick="processWithdraw('${d.id}', '${data.uid}', ${data.amount}, 'Success')">✅ Approve (Pay)</button>
+                            <button class="reject" onclick="processWithdraw('${d.id}', '${data.uid}', ${data.amount}, 'Rejected')">❌ Reject (+50 Bonus)</button>
+                        </div>
+                    </div>`;
+                });
+                list.innerHTML = html || "<p style='color:#ccc'>No pending requests.</p>";
+            } catch(e) { list.innerHTML = "Error: " + e.message; }
+        }
+
+        window.processWithdraw = async (docId, uid, amount, status) => {
+            if(!confirm(`Mark this as ${status}?`)) return;
+
+            // 1. Update Global Status
+            await updateDoc(doc(db, "withdrawals", docId), { status: status });
+
+            let msg = "";
+            
+            // 2. LOGIC: If REJECTED -> Refund + 50 Bonus
+            if(status === 'Rejected') {
+                const refundTotal = amount + 50;
+                await updateDoc(doc(db, "users", uid), { coins: increment(refundTotal) });
+                
+                // Add History Entry
+                await addDoc(collection(db, `history/${uid}/entries`), {
+                    type: "Refund + Bonus (Sorry)",
+                    amount: refundTotal,
+                    status: "Success",
+                    date: serverTimestamp()
+                });
+                msg = `Your withdrawal was rejected. ${amount} coins refunded + 50 Bonus coins added.`;
+            } 
+            // 3. LOGIC: If APPROVED -> Just Notify
+            else {
+                msg = `Congratulations! Your withdrawal of ${amount} coins is Successful.`;
+                // Add History Entry (0 amount because coins already deducted)
+                await addDoc(collection(db, `history/${uid}/entries`), {
+                    type: "Withdrawal Success",
+                    amount: 0,
+                    status: "Success",
+                    date: serverTimestamp()
+                });
+            }
+
+            // 4. Send Notification to User
+            await addDoc(collection(db, `users/${uid}/notifications`), {
+                title: status === 'Success' ? "Payment Successful" : "Withdrawal Rejected",
+                body: msg,
+                date: serverTimestamp()
+            });
+
+            alert("Processed Successfully!");
+            loadWithdrawals();
+        };
+
+        // --- 2. PUSH UPDATE ---
+        window.pushUpdate = async () => {
+            const ver = parseInt(document.getElementById('app-version').value);
+            if(!ver) return alert("Enter version number");
+            
+            // Update Global Settings
+            // Note: If document doesn't exist, setDoc creates it
+            await setDoc(doc(db, "settings", "global"), { version: ver }, { merge: true });
+            alert(`Update Pushed! Users with version < ${ver} will be blocked.`);
+        };
+
+        // --- 3. SEND NOTIFICATION ---
+        window.sendNotification = async () => {
+            const uid = document.getElementById('notif-uid').value.trim();
+            const title = document.getElementById('notif-title').value;
+            const body = document.getElementById('notif-body').value;
+
+            if(!title || !body) return alert("Enter Title and Message");
+
+            if(uid) {
+                // Personal
+                await addDoc(collection(db, `users/${uid}/notifications`), { title, body, date: serverTimestamp() });
+                alert("Sent to User!");
+            } else {
+                // Just update a global announcement text (Simple implementation)
+                await setDoc(doc(db, "settings", "global"), { announcement: body }, { merge: true });
+                alert("Announcement Updated on Home Screen!");
+            }
+        };
+
+        // --- 4. SEARCH & BAN ---
+        window.searchUser = async () => {
+            const uid = document.getElementById('search-uid').value.trim();
+            const res = document.getElementById('user-result');
+            res.innerHTML = "Searching...";
+            
+            try {
+                const snap = await getDoc(doc(db, "users", uid));
+                if(snap.exists()) {
+                    const d = snap.data();
+                    let btn = d.isBanned ? 
+                        `<button class="approve" onclick="toggleBan('${uid}', false)">UN-BAN</button>` : 
+                        `<button class="ban" onclick="toggleBan('${uid}', true)">BAN USER</button>`;
+                    
+                    res.innerHTML = `
+                    <div style="background:#222; padding:10px; border-radius:5px;">
+                        <p>Name: <b>${d.name}</b></p>
+                        <p>Coins: <b style="color:gold">${d.coins}</b></p>
+                        <p>DeviceID: ${d.deviceId}</p>
+                        <p>Status: ${d.isBanned ? '<span style="color:red">BANNED</span>' : 'Active'}</p>
+                        ${btn}
+                    </div>`;
+                } else { res.innerHTML = "User Not Found"; }
+            } catch(e) { res.innerHTML = "Error: " + e.message; }
+        };
+
+        window.toggleBan = async (uid, status) => {
+            if(!confirm("Change Ban status?")) return;
+            await updateDoc(doc(db, "users", uid), { isBanned: status });
+            alert("Status Updated!");
+            searchUser();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Scratch Earn Pro</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --primary: #6c5ce7; --bg: #f5f6fa; --text: #2d3436; --white: #ffffff; --danger: #ff7675; --success: #00b894; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        #auth-screen { position: absolute; top:0; left:0; width:100%; height:100%; background: var(--white); z-index: 1000; display: flex; flex-direction: column; justify-content: center; padding: 25px; }
+        .auth-card h1 { color: var(--primary); margin-bottom: 20px; text-align: center; }
+        input, select { width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; background: #f9f9f9; outline: none; }
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; transition: 0.2s; }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: var(--primary); }
+        .btn-danger { background: var(--danger); }
+        .switch-auth { text-align: center; margin-top: 20px; font-size: 14px; }
+        .switch-auth span { color: var(--primary); font-weight: bold; cursor: pointer; }
+
+        #app-container { display: none; height: 100%; flex-direction: column; }
+        .page { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 80px; display: none; }
+        .page.active { display: block; animation: fadeIn 0.3s; }
+        
+        .header { background: var(--primary); padding: 20px; color: white; border-radius: 0 0 25px 25px; display: flex; justify-content: space-between; align-items: center; margin: -20px -20px 20px -20px; box-shadow: 0 4px 10px rgba(108, 92, 231, 0.3); }
+        .coin-badge { background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; font-weight: bold; display: flex; align-items: center; gap: 5px; }
+        
+        .card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; }
+        .task-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white; margin-right: 15px; }
+
+        .ref-grid { display: flex; gap: 10px; margin-top: 10px; width: 100%; justify-content: space-between; }
+        .ref-btn { flex: 1; padding: 10px; border-radius: 10px; border: none; color: white; font-weight: bold; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; }
+
+        .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 12px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 100; }
+        .nav-item { text-align: center; color: #b2bec3; font-size: 11px; }
+        .nav-item i { font-size: 22px; display: block; margin-bottom: 4px; }
+        .nav-item.active { color: var(--primary); }
+
+        .overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; justify-content: center; align-items: center; flex-direction: column; color: white; }
+        .popup { background: white; color: #333; padding: 20px; border-radius: 20px; width: 90%; max-width: 350px; text-align: center; position: relative; max-height: 80vh; overflow-y: auto; }
+        
+        .legal-text { text-align: left; font-size: 13px; color: #555; line-height: 1.6; }
+        .legal-text h4 { color: var(--primary); margin-top: 15px; margin-bottom: 5px; }
+        
+        #ban-screen, #update-screen { position: absolute; top:0; left:0; width:100%; height:100%; background: #2d3436; z-index: 6000; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 30px; }
+        #update-screen { background: #6c5ce7; }
+        #toast { visibility: hidden; min-width: 250px; margin-left: -125px; background-color: #333; color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 5000; left: 50%; top: 30px; font-size: 14px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+
+        .scratch-area { position: relative; width: 250px; height: 150px; margin: 0 auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: inset 0 0 10px rgba(0,0,0,0.1); }
+        canvas#scratch-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; cursor: pointer; }
+        .wheel-container { position: relative; width: 250px; height: 250px; margin: 0 auto 20px auto; }
+        .wheel { width: 100%; height: 100%; border-radius: 50%; border: 5px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.2); transition: transform 4s cubic-bezier(0.17, 0.67, 0.83, 0.67); background: conic-gradient(#ff7675 0deg 60deg, #74b9ff 60deg 120deg, #55efc4 120deg 180deg, #ffeaa7 180deg 240deg, #a29bfe 240deg 300deg, #fab1a0 300deg 360deg); }
+        .marker { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 30px solid #2d3436; z-index: 10; }
+
+        @keyframes fadein { from {top: 0; opacity: 0;} to {top: 30px; opacity: 1;} }
+        @keyframes fadeout { from {top: 30px; opacity: 1;} to {top: 0; opacity: 0;} }
+    </style>
+</head>
+<body>
+
+    <div id="toast">Message</div>
+
+    <div id="update-screen">
+        <i class="fas fa-cloud-download-alt" style="font-size:60px; margin-bottom:20px;"></i>
+        <h2>UPDATE AVAILABLE</h2>
+        <p>Please update app to continue.</p>
+        <button class="btn" style="background:white; color:#6c5ce7; margin-top:20px;" onclick="window.location.reload()">UPDATE NOW</button>
+    </div>
+
+    <div id="ban-screen">
+        <i class="fas fa-ban" style="font-size:60px; margin-bottom:20px;"></i>
+        <h2>ACCOUNT BANNED</h2>
+        <p>Contact Support on Telegram.</p>
+    </div>
+
+    <div id="auth-screen">
+        <div class="auth-card">
+            <h1>Scratch Earn Pro</h1>
+            <div id="login-form">
+                <input type="email" id="login-email" placeholder="Email Address">
+                <input type="password" id="login-pass" placeholder="Password">
+                <button class="btn btn-primary" onclick="window.loginUser()">Login</button>
+                <p class="switch-auth">New user? <span onclick="window.toggleAuth('signup')">Create Account</span></p>
+            </div>
+            <div id="signup-form" style="display:none;">
+                <input type="text" id="reg-name" placeholder="Full Name">
+                <input type="email" id="reg-email" placeholder="Email Address">
+                <input type="password" id="reg-pass" placeholder="Password">
+                <button class="btn btn-primary" onclick="window.registerUser()">Sign Up</button>
+                <p class="switch-auth">Have an account? <span onclick="window.toggleAuth('login')">Login</span></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-container">
+        <div id="home" class="page active">
+            <div class="header">
+                <div><h3 style="font-weight:400;">Hi, <span id="user-name">User</span></h3></div>
+                <div class="coin-badge"><i class="fas fa-coins" style="color:#f1c40f;"></i> <span id="balance">0</span></div>
+            </div>
+            <p style="margin-bottom:10px; font-weight:bold; color:#555;">Daily Tasks</p>
+            <div class="card" onclick="window.startTask('scratch')">
+                <div style="display:flex; align-items:center;">
+                    <div class="task-icon" style="background:#ff7675;"><i class="fas fa-eraser"></i></div>
+                    <div><b>Scratch Card</b><p style="font-size:12px; color:#888;">Left: <span id="scratch-left">10</span></p></div>
+                </div>
+                <div style="background:#f0f0f0; padding:5px 15px; border-radius:15px; font-size:12px; font-weight:bold;">Play</div>
+            </div>
+            <div class="card" onclick="window.startTask('spin')">
+                <div style="display:flex; align-items:center;">
+                    <div class="task-icon" style="background:#74b9ff;"><i class="fas fa-sync-alt"></i></div>
+                    <div><b>Spin Wheel</b><p style="font-size:12px; color:#888;">Left: <span id="spin-left">10</span></p></div>
+                </div>
+                <div style="background:#f0f0f0; padding:5px 15px; border-radius:15px; font-size:12px; font-weight:bold;">Play</div>
+            </div>
+            <div class="card" style="display:block; text-align:left;">
+                <div style="display:flex; align-items:center; margin-bottom:10px;">
+                    <div class="task-icon" style="background:#00b894;"><i class="fas fa-user-plus"></i></div>
+                    <div><b>Refer & Earn</b><p style="font-size:12px; color:#888;">Get 200 Coins per invite</p></div>
+                </div>
+                <p style="font-size:11px; background:#f1f2f6; padding:8px; border-radius:5px; border:1px dashed #ccc; margin-bottom:10px; word-break:break-all;" id="ref-link-display">Generating...</p>
+                <div class="ref-grid">
+                    <button class="ref-btn" style="background:#0984e3;" onclick="window.copyRefLink()"><i class="fas fa-copy"></i> Copy</button>
+                    <button class="ref-btn" style="background:#25D366;" onclick="window.shareTo('whatsapp')"><i class="fab fa-whatsapp"></i> WA</button>
+                    <button class="ref-btn" style="background:#0088cc;" onclick="window.shareTo('telegram')"><i class="fab fa-telegram-plane"></i> TG</button>
+                    <button class="ref-btn" style="background:#6c5ce7;" onclick="window.shareApp()"><i class="fas fa-share-alt"></i> More</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="wallet" class="page">
+            <div class="header"><h3>Wallet</h3></div>
+            <div style="text-align:center; padding:30px 0;"><p style="color:#888;">Current Balance</p><h1 style="font-size:40px; color:var(--primary);"><i class="fas fa-coins" style="color:#f1c40f;"></i> <span id="wallet-bal">0</span></h1></div>
+            <h4 style="margin-bottom:10px;">Withdraw Methods</h4>
+            <div class="card" onclick="window.openWithdrawModal('UPI')">
+                <div style="display:flex; align-items:center;"><i class="fas fa-university" style="color:var(--primary); font-size:24px; margin-right:15px;"></i><b>UPI Transfer</b></div>
+                <i class="fas fa-chevron-right" style="color:#ccc;"></i>
+            </div>
+            <div class="card" onclick="window.openWithdrawModal('Redeem')">
+                <div style="display:flex; align-items:center;"><i class="fab fa-google-play" style="color:#00b894; font-size:24px; margin-right:15px;"></i><b>Redeem Code</b></div>
+                <i class="fas fa-chevron-right" style="color:#ccc;"></i>
+            </div>
+        </div>
+
+        <div id="history" class="page">
+            <div class="header"><h3>History</h3></div>
+            <div id="history-list" style="margin-top:20px; text-align:center; color:#888;"><p>Loading history...</p></div>
+        </div>
+
+        <div id="profile" class="page">
+            <div class="header"><h3>Profile</h3></div>
+            <div style="text-align:center; margin-top:20px;">
+                <div style="width:80px; height:80px; background:#dfe6e9; border-radius:50%; margin:0 auto; display:flex; align-items:center; justify-content:center; font-size:30px; color:#636e72; font-weight:bold;">U</div>
+                <h3 id="p-name" style="margin-top:10px;">User</h3>
+                <p id="p-email" style="color:#888; font-size:14px;">Loading...</p>
+                <p style="font-size:10px; color:#b2bec3; margin-top:5px;">UID: <span id="p-uid">...</span></p>
+                <h4 style="margin-top:25px; margin-bottom:10px; text-align:left;">Support</h4>
+                <div class="card" onclick="window.open('http://t.me/MASTEREARNNIK', '_blank')">
+                    <div style="display:flex; align-items:center;"><i class="fab fa-telegram-plane" style="color:#0984e3; width:30px; font-size:20px;"></i><b>Telegram Support</b></div>
+                    <i class="fas fa-chevron-right" style="color:#ccc;"></i>
+                </div>
+                <div class="card" onclick="window.location.href='mailto:scratchearn.help@gmail.com'">
+                    <div style="display:flex; align-items:center;"><i class="fas fa-envelope" style="color:#e17055; width:30px; font-size:20px;"></i><b>Email Support</b></div>
+                    <i class="fas fa-chevron-right" style="color:#ccc;"></i>
+                </div>
+                <h4 style="margin-top:20px; margin-bottom:10px; text-align:left;">Legal</h4>
+                <div class="card" onclick="window.showTextModal('FAQs')"><span>FAQs</span><i class="fas fa-chevron-right" style="color:#ccc;"></i></div>
+                <div class="card" onclick="window.showTextModal('Privacy')"><span>Privacy Policy</span><i class="fas fa-chevron-right" style="color:#ccc;"></i></div>
+                <div class="card" onclick="window.showTextModal('Terms')"><span>Terms & Conditions</span><i class="fas fa-chevron-right" style="color:#ccc;"></i></div>
+                <button class="btn btn-danger" style="margin-top:20px; width:100%;" onclick="window.logout()">Logout</button>
+            </div>
+        </div>
+
+        <div class="nav-bar">
+            <div class="nav-item active" onclick="window.nav('home')" id="nav-home"><i class="fas fa-home"></i>Home</div>
+            <div class="nav-item" onclick="window.nav('wallet')" id="nav-wallet"><i class="fas fa-wallet"></i>Wallet</div>
+            <div class="nav-item" onclick="window.nav('history')" id="nav-history"><i class="fas fa-history"></i>History</div>
+            <div class="nav-item" onclick="window.nav('profile')" id="nav-profile"><i class="fas fa-user"></i>Profile</div>
+        </div>
+    </div>
+
+    <!-- MODALS -->
+    <div id="ad-modal" class="overlay" style="z-index:4000;"><div class="popup" style="background:black; color:white; border:2px solid gold;"><h3>Sponsored Ad</h3><p>Task loading...</p><h1 id="ad-timer" style="font-size:50px; color:gold; margin:20px 0;">10</h1><div style="background:#333; padding:20px;">[ ADVERTISEMENT ]</div></div></div>
+    <div id="scratch-modal" class="overlay"><div class="popup"><h3>Scratch & Win</h3><div class="scratch-area"><div class="scratch-reward">+10</div><canvas id="scratch-canvas" width="250" height="150"></canvas></div><button class="btn btn-primary" id="claim-scratch-btn" style="display:none;" onclick="window.processClaim('scratch')">Claim 10 Coins</button><button class="btn" style="background:#eee; margin-top:10px; color:#333;" onclick="document.getElementById('scratch-modal').style.display='none'">Close</button></div></div>
+    <div id="spin-modal" class="overlay"><div class="popup"><h3>Spin Wheel</h3><div class="wheel-container"><div class="marker"></div><div class="wheel" id="wheel-el"></div></div><button class="btn btn-primary" id="spin-btn-action" onclick="window.spinTheWheel()">Spin Now</button><button class="btn" style="background:#eee; margin-top:10px; color:#333;" onclick="document.getElementById('spin-modal').style.display='none'">Close</button></div></div>
+    <div id="withdraw-modal" class="overlay"><div class="popup" style="text-align:left;"><h3 id="w-title" style="text-align:center;">Withdraw</h3><label>Amount</label><select id="w-amount"></select><label>Detail</label><input type="text" id="w-detail" placeholder="Enter UPI/Email"><button class="btn btn-primary" onclick="window.initiateWithdraw()">Submit Request</button><button class="btn" style="background:#eee; margin-top:10px; color:#333;" onclick="document.getElementById('withdraw-modal').style.display='none'">Cancel</button></div></div>
+    <div id="text-modal" class="overlay"><div class="popup" style="text-align:left;"><h3 id="text-title" style="text-align:center;">Title</h3><div id="text-body" class="legal-text"></div><button class="btn" onclick="document.getElementById('text-modal').style.display='none'">Close</button></div></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, addDoc, query, orderBy, getDocs, increment, onSnapshot, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+        const firebaseConfig = { apiKey: "AIzaSyDd1yHbSx1TYuY53nag-nzckea-7yQGah4", authDomain: "studio-3036297528-fe06e.firebaseapp.com", databaseURL: "https://studio-3036297528-fe06e-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "studio-3036297528-fe06e", storageBucket: "studio-3036297528-fe06e.firebasestorage.app", messagingSenderId: "877834878384", appId: "1:877834878384:web:3be84e775aac68c91aaa75" };
+        const app = initializeApp(firebaseConfig); const auth = getAuth(app); const db = getFirestore(app);
+        
+        let userData = {};
+        const CURRENT_APP_VERSION = 1;
+
+        function showToast(msg) { const t = document.getElementById("toast"); t.className = "show"; t.innerText = msg; setTimeout(() => t.className = t.className.replace("show", ""), 3000); }
+        function getDeviceId() { let did = localStorage.getItem('did'); if(!did) { did = 'dev_' + Date.now(); localStorage.setItem('did', did); } return did; }
+
+        window.toggleAuth = (m) => { document.getElementById('login-form').style.display = m==='login'?'block':'none'; document.getElementById('signup-form').style.display = m==='signup'?'block':'none'; };
+        window.registerUser = async () => {
+            const name = document.getElementById('reg-name').value; const email = document.getElementById('reg-email').value; const pass = document.getElementById('reg-pass').value;
+            if(!name || !email) return showToast("Fill all fields");
+            try {
+                const q = query(collection(db, "users"), where("deviceId", "==", getDeviceId())); const snap = await getDocs(q);
+                if(!snap.empty) return showToast("Device registered!");
+                const cred = await createUserWithEmailAndPassword(auth, email, pass);
+                const referBy = new URLSearchParams(window.location.search).get('ref');
+                await setDoc(doc(db, "users", cred.user.uid), { name, email, coins: 50, uid: cred.user.uid, deviceId: getDeviceId(), isBanned: false, scratchCount:0, spinCount:0, lastDate: new Date().toDateString() });
+                if(referBy) try { await updateDoc(doc(db, "users", referBy), { coins: increment(200) }); await addDoc(collection(db, `history/${referBy}/entries`), { type: "Referral Bonus", amount: 200, status: "Success", date: serverTimestamp() }); } catch(e){}
+                showToast("Welcome! +50 Coins Added");
+            } catch(e) { showToast(e.message); }
+        };
+        window.loginUser = async () => { try { await signInWithEmailAndPassword(auth, document.getElementById('login-email').value, document.getElementById('login-pass').value); } catch(e) { showToast("Wrong Credentials"); } };
+        window.logout = () => signOut(auth);
+        
+        window.startTask = (type) => { 
+            if(type === 'scratch' && (userData.scratchCount||0)>=10) return showToast("Limit Reached");
+            if(type === 'spin' && (userData.spinCount||0)>=10) return showToast("Limit Reached");
+            if(type==='scratch'){ document.getElementById('scratch-modal').style.display='flex'; document.getElementById('claim-scratch-btn').style.display='none'; initScratch(); }
+            else { document.getElementById('spin-modal').style.display='flex'; document.getElementById('spin-btn-action').disabled=false; }
+        };
+        window.openScratch = () => window.startTask('scratch'); window.openSpin = () => window.startTask('spin');
+
+        window.processClaim = (type) => {
+            document.getElementById(type+'-modal').style.display='none';
+            document.getElementById('ad-modal').style.display='flex';
+            let t = 10; const el = document.getElementById('ad-timer'); el.innerText=t;
+            const i = setInterval(() => { t--; el.innerText=t; if(t<=0){ clearInterval(i); document.getElementById('ad-modal').style.display='none'; finalizeReward(type); } }, 1000);
+        };
+        async function finalizeReward(type) {
+            const user = auth.currentUser;
+            try { 
+                await updateDoc(doc(db, "users", user.uid), { coins: increment(10), [type+'Count']: increment(1) }); 
+                await addDoc(collection(db, `history/${user.uid}/entries`), { type: type==='scratch'?'Scratch Win':'Spin Win', amount: 10, status: 'Success', date: serverTimestamp() });
+                showToast("10 Coins Added Successfully!"); 
+            } catch(e){ showToast("Error adding coins"); }
+        }
+
+        function initScratch() { const c = document.getElementById('scratch-canvas'); const ctx = c.getContext('2d'); ctx.fillStyle='#b2bec3'; ctx.fillRect(0,0,250,150); ctx.fillStyle='#555'; ctx.font='20px Arial'; ctx.fillText('Scratch Here', 70, 80); let isD=false; const scratch=(x,y)=>{ ctx.globalCompositeOperation='destination-out'; ctx.beginPath(); ctx.arc(x,y,20,0,Math.PI*2); ctx.fill(); setTimeout(()=>document.getElementById('claim-scratch-btn').style.display='block',500); }; c.ontouchstart=(e)=>{isD=true;e.preventDefault();}; c.ontouchend=()=>isD=false; c.ontouchmove=(e)=>{if(isD){const r=c.getBoundingClientRect(); scratch(e.touches[0].clientX-r.left, e.touches[0].clientY-r.top);}}; c.onmousedown=()=>isD=true; c.onmouseup=()=>isD=false; c.onmousemove=(e)=>{if(isD)scratch(e.offsetX,e.offsetY);}; }
+        window.spinTheWheel = () => { const w = document.getElementById('wheel-el'); document.getElementById('spin-btn-action').disabled=true; w.style.transition='transform 4s ease-out'; w.style.transform=`rotate(${Math.floor(1800+Math.random()*360)}deg)`; setTimeout(()=>{ showToast("You Won 10 Coins!"); window.processClaim('spin'); }, 4100); };
+
+        window.copyRefLink = () => { const t = document.createElement("textarea"); t.value = document.getElementById('ref-link-display').innerText; document.body.appendChild(t); t.select(); try{document.execCommand('copy'); showToast("Link Copied!");}catch(e){} document.body.removeChild(t); };
+        window.shareTo = (app) => { const l = document.getElementById('ref-link-display').innerText; const m = `Join Scratch Earn & Get 50 Coins! Link: ${l}`; if(app==='whatsapp') window.open(`https://wa.me/?text=${encodeURIComponent(m)}`, '_blank'); else window.open(`https://t.me/share/url?url=${encodeURIComponent(l)}&text=${encodeURIComponent(m)}`, '_blank'); };
+        window.shareApp = async () => { if(navigator.share) { try { await navigator.share({ title: 'Earn', text: 'Join now:', url: document.getElementById('ref-link-display').innerText }); } catch(err){} } else window.copyRefLink(); };
+
+        window.openWithdrawModal = (m) => { 
+            document.getElementById('withdraw-modal').style.display='flex'; 
+            document.getElementById('w-title').innerText = m + " Withdraw";
+            const s = document.getElementById('w-amount'); 
+            // FIXED WITHDRAWAL OPTIONS (UPI: 15/25/50, Redeem: 15/25)
+            if(m==='UPI') s.innerHTML = `<option value="900">900 Coins = ₹15</option><option value="3000">3000 Coins = ₹25</option><option value="4500">4500 Coins = ₹50</option>`; 
+            else s.innerHTML = `<option value="1500">1500 Coins = ₹15 Code</option><option value="3000">3000 Coins = ₹25 Code</option>`; 
+            document.getElementById('w-detail').placeholder = m === 'UPI' ? "Enter UPI ID" : "Enter Email";
+        };
+        
+        window.initiateWithdraw = () => { const amt = parseInt(document.getElementById('w-amount').value); if(userData.coins < amt) return showToast("Low Balance"); document.getElementById('withdraw-modal').style.display='none'; document.getElementById('ad-modal').style.display='flex'; let t=5; const el=document.getElementById('ad-timer'); el.innerText=t; const i=setInterval(()=>{ t--; el.innerText=t; if(t<=0){ clearInterval(i); document.getElementById('ad-modal').style.display='none'; finalizeWithdraw(amt); } }, 1000); };
+        
+        async function finalizeWithdraw(amt) {
+            const user = auth.currentUser;
+            await updateDoc(doc(db, "users", user.uid), { coins: increment(-amt) });
+            await addDoc(collection(db, `history/${user.uid}/entries`), { type: "Withdrawal", amount: -amt, status: 'Pending', date: serverTimestamp() });
+            await addDoc(collection(db, "withdrawals"), { uid: user.uid, amount: amt, method: 'Request', detail: document.getElementById('w-detail').value, status: 'Pending', date: serverTimestamp() });
+            showToast("Request Submitted!");
+        }
+
+        async function loadHistory() { 
+            const user = auth.currentUser; if(!user) return; 
+            const list = document.getElementById('history-list'); list.innerHTML = "Loading..."; 
+            try { 
+                const q = query(collection(db, `history/${user.uid}/entries`), orderBy("date", "desc")); 
+                const snap = await getDocs(q); 
+                let html = ""; 
+                snap.forEach(d => { 
+                    const v = d.data(); 
+                    const dt = v.date && v.date.toDate ? v.date.toDate().toLocaleDateString() : "Just now";
+                    html += `<div style="background:#f9f9f9; padding:10px; margin-bottom:5px; border-radius:5px; text-align:left; display:flex; justify-content:space-between;">
+                        <div><b>${v.type}</b><br><span style="font-size:10px; color:#888;">${dt}</span></div>
+                        <div style="text-align:right;"><b style="color:${v.amount>0?'green':'red'}">${v.amount>0?'+':''}${v.amount}</b><br><span style="font-size:10px;">${v.status}</span></div>
+                    </div>`; 
+                }); 
+                list.innerHTML = html || "No transactions yet."; 
+            } catch(e) { list.innerHTML = "No history found."; } 
+        }
+
+        window.showTextModal = (type) => { 
+            const modal = document.getElementById('text-modal'); document.getElementById('text-title').innerText = type; modal.style.display = 'flex';
+            let txt = "";
+            if(type === 'FAQs') txt = `<h4>How to earn?</h4><p>Complete daily Scratch and Spin tasks.</p><h4>When do I get paid?</h4><p>Payments are processed within 24 hours.</p>`; 
+            else if(type === 'Privacy') txt = `<h4>Privacy Policy</h4><p>We collect your email for login purposes only. We do not share data with third parties.</p>`; 
+            else txt = `<h4>Terms & Conditions</h4><p>1. One account per device.<br>2. Using VPN/Proxy is prohibited.<br>3. We can ban suspicious accounts.</p>`; 
+            document.getElementById('text-body').innerHTML = txt;
+        };
+
+        function listenToUserData(uid) {
+            onSnapshot(doc(db, "users", uid), (d) => { if(d.exists()) { userData=d.data(); if(userData.isBanned) document.getElementById('ban-screen').style.display='flex'; document.getElementById('balance').innerText=userData.coins; document.getElementById('wallet-bal').innerText=userData.coins; document.getElementById('user-name').innerText=userData.name; document.getElementById('scratch-left').innerText=10-(userData.scratchCount||0); document.getElementById('spin-left').innerText=10-(userData.spinCount||0); } });
+            onSnapshot(doc(db, "settings", "global"), (d) => { if(d.exists() && d.data().version > CURRENT_APP_VERSION) document.getElementById('update-screen').style.display='flex'; });
+        }
+        
+        async function ensureUserDoc(user) { try { const ref = doc(db, "users", user.uid); const snap = await getDoc(ref); if(!snap.exists()) { await setDoc(ref, { name: "User", email: user.email, coins: 0, uid: user.uid, scratchCount: 0, spinCount: 0, deviceId: getDeviceId(), isBanned: false, lastDate: new Date().toDateString() }); location.reload(); } } catch(e) {} }
+        
+        onAuthStateChanged(auth, async (user) => { if(user) { 
+            document.getElementById('auth-screen').style.display='none'; document.getElementById('app-container').style.display='flex'; 
+            document.getElementById('p-email').innerText=user.email; document.getElementById('p-uid').innerText=user.uid;
+            document.getElementById('ref-link-display').innerText = window.location.origin + window.location.pathname + "?ref=" + user.uid;
+            listenToUserData(user.uid); ensureUserDoc(user);
+        } else { document.getElementById('auth-screen').style.display='flex'; document.getElementById('app-container').style.display='none'; } });
+        
+        window.nav = (p) => { document.querySelectorAll('.page').forEach(e=>e.classList.remove('active')); document.getElementById(p).classList.add('active'); if(p==='history') loadHistory(); };
+    </script>
+</body>
+</html>
